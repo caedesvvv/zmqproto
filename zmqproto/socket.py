@@ -26,9 +26,10 @@ class ZmqSocket(object):
         return proto
 
     def on_connection_error(self, reason):
+        from twisted.internet import reactor
         print reason.getErrorMessage()
         print "Reconnect in 10 seconds..."
-        reactor.callLater(10, self.setup, self.address)
+        reactor.callLater(10, self.connect, self.address)
         return reason
 
     def parse_address(self, address):
