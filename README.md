@@ -1,4 +1,4 @@
-ZmqProto
+Zmq Proto
 ================================
 
 A pure python zmq library.
@@ -7,7 +7,7 @@ Barebones python implementation so clients don't need to depend on the binary li
 
 The library implements protocols 1, 2 and 3. Only protocol 1 is really tested for now but more will follow as we polish the implementation.
 
-At the moment depends uses twisted for networking, but it will be optional in the future.
+At the moment uses twisted for networking, but it will be optional in the future.
 
 Examples
 -------------------------
