@@ -4,7 +4,7 @@ import sys
 setup(
         name='zmqproto',
         version='0.1.0',
-        packages=['zmqproto', 'txzmq.test'],
+        packages=['zmqproto'],
         license='AGPLv3',
         author='Pablo Martin',
         author_email='caedes@sindominio.net',
