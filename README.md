@@ -15,12 +15,16 @@ Examples
     print "Create test client"
     p = ZmqSocket()
     p.connect('tcp://192.168.1.171:9091')
-    reactor.run()
+
+    # send some binary data
+    p.send('foo!', 1) # second parameter is the 'send more' flag
+    p.send('bar')
    
     print "Create a test protocol"
     proto = Zmq3Protocol()
     greeting = proto.buildGreeting()
     handshake = proto.buildReadyHandshake()
+
     prop1 = proto.buildProperty('Socket-Type', 'DEALER')
     prop2 = proto.buildProperty('Identity', '')
 
@@ -29,6 +33,8 @@ Examples
     proto.dataReceived(greeting[12:16])
     proto.dataReceived(greeting[16:])
     proto.dataReceived(proto.buildFrame(handshake+prop1+prop2))
+
+    reactor.run()
 
 --
 
