@@ -115,7 +115,7 @@ class Zmq3Protocol(Protocol):
         msg += data
         return msg
 
-    def parseFrameData(self, data, offset=0):
+    def parseFrameDataChunk(self, data, offset=0):
         # If offset is too big we're finished parsing
         data_len = len(data)
         if data_len <= offset:
@@ -132,14 +132,14 @@ class Zmq3Protocol(Protocol):
                 self.next_part = 2
             else:
                 self.next_part = 1
-            self.parseFrameData(data, offset + 1)
+            return offset + 1
         # Short size
         elif self.next_part == 1:
             size = struct.unpack_from('B', data, offset)[0]
             self.size = size
             self.next_part = 3
             print " start short size", self.size
-            self.parseFrameData(data, offset + 1)
+            return offset
         # Extended size
         elif self.next_part == 2:
             print " start extended size"
@@ -148,17 +148,22 @@ class Zmq3Protocol(Protocol):
             else:
                 self.size = struct.unpack_from('Q', data, offset)[0]
                 self.next_part += 1
-                self.parseFrameData(data, offset + 8)
+                return offset + 8
         # Data
         elif self.next_part == 3:
             print " check_data", data_len, offset+self.size
             if data_len >= offset + self.size:
                 self.frameReceived(data[offset:offset+self.size], self.is_command, self.more)
                 self.next_part = 0
-                self.parseFrameData(data, offset + self.size)
+                return offset + self.size
             else:
                 # save for later
                 self._data = data[offset:]
+
+    def parseFrameData(self, data, offset=0):
+        offset = self.parseFrameDataChunk(data, offset)
+        while not offset == None:
+            offset = self.parseFrameDataChunk(data, offset)
 
     def getNext(self):
         if self._frames:
