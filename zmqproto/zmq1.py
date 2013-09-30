@@ -38,7 +38,7 @@ class Zmq1Protocol(Zmq3Protocol):
         msg += data
         return msg
 
-    def parseFrameData(self, data, offset=0):
+    def parseFrameDataChunk(self, data, offset):
         # If offset is too big we're finished parsing
         data_len = len(data)
         if data_len <= offset:
@@ -55,16 +55,22 @@ class Zmq1Protocol(Zmq3Protocol):
             offset += 1
             self.more = flags & FLAG_MORE         # only for messages
             self.next_part += 1
-            self.parseFrameData(data, offset)
+            return offset
         # Data
         else:
             if data_len >= offset + self.size:
                 self.frameReceived(data[offset:offset+self.size], False, self.more)
                 self.next_part = 0
-                self.parseFrameData(data, offset + self.size)
+                return offset+self.size
             else:
                 # save for later
                 self._data = data[offset:]
+
+
+    def parseFrameData(self, data, offset=0):
+        offset = self.parseFrameDataChunk(data, offset)
+        while not offset == None:
+            offset = self.parseFrameDataChunk(data, offset)
 
 
 class Zmq1Factory(Factory):
