@@ -1,1 +1,3 @@
-from socket import ZmqSocket
+from zmqsocket import ZmqSocket
+
+import zmqsocket as socket

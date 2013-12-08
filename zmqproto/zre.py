@@ -23,7 +23,7 @@ class ZreProtocol:
     def parseBeacon(self, data):
         uuid = struct.unpack('H', data[4:6])[0]
         port = struct.unpack('H', data[6:])[0]
-        return uuid, ports
+        return uuid, port
 
     def buildHeader(self):
         self.seq += 1
