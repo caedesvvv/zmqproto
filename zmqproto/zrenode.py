@@ -20,9 +20,6 @@ class ZreNode(DatagramProtocol):
         self.loopObj.start(10, now=True)
 
     def sendHeartBeat(self):
-        #print self.transport, dir(self.transport)
-        #print self.transport.socket, dir(self.transport.socket)
-        print "* heartbeat"
         self.transport.socket.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
         self.transport.write(self.proto.buildBeacon(), ('127.255.255.255', 5670))
 
