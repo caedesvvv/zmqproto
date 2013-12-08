@@ -74,7 +74,9 @@ class Zmq1Protocol(Zmq3Protocol):
 
 
 class Zmq1Factory(Factory):
+    def __init__(self, type):
+        self.type = type
     def buildProtocol(self, addr):
-        return Zmq1Protocol()
+        return Zmq1Protocol(self.type)
 
 

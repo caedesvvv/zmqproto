@@ -2,19 +2,19 @@
 DEBUG = False
 
 class ZmqSocket(object):
-    def __init__(self, cb=None, version=1):
+    def __init__(self, cb=None, version=1, type='DEALER'):
         self.proto = None
         self._cb = cb
         self._queue = []
         if version == 1:
             from zmq1 import Zmq1Factory
-            self.factory = Zmq1Factory()
+            self.factory = Zmq1Factory(type)
         elif version == 2:
             from zmq2 import Zmq2Factory
-            self.factory = Zmq2Factory()
+            self.factory = Zmq2Factory(type)
         elif version == 3:
             from zmq3 import Zmq3Factory
-            self.factory = Zmq3Factory()
+            self.factory = Zmq3Factory(type)
 
     def on_protocol(self, proto):
         self.proto = proto

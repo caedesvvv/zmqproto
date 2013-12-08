@@ -15,9 +15,10 @@ class Zmq3Protocol(Protocol):
     header_size = 11
     send_handshake = True
     # http://rfc.zeromq.org/spec:23
-    def __init__(self):
+    def __init__(self, type='DEALER'):
         if DEBUG:
             print "Connecting"
+        self.type = type
         self._zmqconnected = 0
         self.next_part = 0
         self.proto_state = 0
@@ -58,15 +59,25 @@ class Zmq3Protocol(Protocol):
 
         return data
 
+    def buildSubscribeHandshake(self):
+        subscription = '' # filter... not set for now
+        cmd = 'SUBSCRIBE' + subscription
+        data = struct.pack('BB', len(cmd), 0xd9) + cmd
+        return data
+
     def buildReadyHandshake(self):
         cmd = 'READY'
-        data = struct.pack('B', len(cmd)) + cmd
-        #data = struct.pack('BB', len(cmd), 0xd5) + cmd
+        #data = struct.pack('B', len(cmd)) + cmd
+        data = struct.pack('BB', len(cmd), 0xd5) + cmd
         return data
 
     def buildHandshake(self):
-        data = self.buildReadyHandshake()
-        data += self.buildProperty('Socket-Type', 'DEALER')
+        if self.type == 'SUB':
+            data = self.buildSubscribeHandshake()
+            data += self.buildProperty('Socket-Type', 'SUB')
+        else:
+            data = self.buildReadyHandshake()
+            data += self.buildProperty('Socket-Type', 'DEALER')
         data += self.buildProperty('Identity', '')
         return data
 
@@ -203,8 +214,11 @@ class Zmq3Protocol(Protocol):
             if DEBUG:
                 print "send", data
             self._queue.append((data, more))
+
 class Zmq3Factory(Factory):
+    def __init__(self, type):
+        self.type = type
     def buildProtocol(self, addr):
-        return Zmq3Protocol()
+        return Zmq3Protocol(self.type)
 
 
