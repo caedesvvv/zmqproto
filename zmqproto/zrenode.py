@@ -6,9 +6,10 @@ from zmqproto.zre import ZreProtocol
 from socket import SOL_SOCKET, SO_BROADCAST
 
 class ZreNode(DatagramProtocol):
-    def __init__(self, ipaddr):
+    def __init__(self, ipaddr, peer_cb=None):
         self.proto = ZreProtocol(ipaddr)
         self.peers = {}
+        self.peer_cb = peer_cb
         reactor.listenMulticast(5670, self, listenMultiple=True)
 
     def startProtocol(self):
@@ -21,7 +22,7 @@ class ZreNode(DatagramProtocol):
 
     def sendHeartBeat(self):
         self.transport.socket.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
-        self.transport.write(self.proto.buildBeacon(), ('127.255.255.255', 5670))
+        self.transport.write(self.proto.buildBeacon(), ('255.255.255.255', 5670))
 
     def datagramReceived(self, data, (host, port)):
         uuid, _port = self.proto.parseBeacon(data)
@@ -29,6 +30,8 @@ class ZreNode(DatagramProtocol):
             if not uuid in self.peers:
                 self.peers[uuid] = [_port, host, port]
                 print "[%s] beacon id %s port %s [%s:%d]" % (self.proto.uuid, uuid, _port, host, port)
+                if self.peer_cb:
+                    self.peer_cb(uuid)
 
 
 if __name__ == '__main__':
