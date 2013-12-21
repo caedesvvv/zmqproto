@@ -46,9 +46,16 @@ class Zmq1Protocol(Zmq3Protocol):
             return
         # Flags and size
         if self.next_part == 0:
+            # if not enough data save for later
+            if data_len < offset + 3:
+                self._data = data[offset:]
+                return
             self.size = struct.unpack_from('B', data, offset)[0]-1
             offset += 1
             if self.size == 254:
+                if data_len < offset + 9:
+                    self._data = data[offset-1:]
+                    return
                 self.size = struct.unpack_from('>Q', data, offset)[0]-1
                 offset += 8
             flags = struct.unpack_from('B', data, offset)[0]
