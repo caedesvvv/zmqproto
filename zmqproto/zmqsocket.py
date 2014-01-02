@@ -56,9 +56,9 @@ class ZmqSocket(object):
         print "Not implemented"
         return self.proto.getNext()
 
-    def send(self, data, more=0):
+    def send(self, data, more=0, is_cmd=1):
         if self.proto:
-            return self.proto.send(data, more)
+            return self.proto.send(data, more, is_cmd)
         else:
-            self._queue.append((data, more))
+            self._queue.append((data, more, is_cmd))
 

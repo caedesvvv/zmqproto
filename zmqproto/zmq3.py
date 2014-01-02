@@ -6,13 +6,13 @@ FLAG_MORE = 1
 FLAG_LONG = 2
 FLAG_CMD = 4
 
-SIGNATURE = chr(0xFF)+chr(0)*8+chr(0x7F)
+SIGNATURE = chr(0xFF)+chr(0)*7+chr(0)+chr(0x7F)
 
 DEBUG = False
 
 class Zmq3Protocol(Protocol):
     version = 3
-    header_size = 11
+    header_size = 10
     send_handshake = True
     # http://rfc.zeromq.org/spec:23
     def __init__(self, type='DEALER'):
@@ -32,17 +32,39 @@ class Zmq3Protocol(Protocol):
         self._cbs.append(cb)
 
     def frameReceived(self, data, cmd, wants_more):
-        self._frames.append(data)
-        for cb in self._cbs:
-            cb(data, wants_more)
+        if cmd:
+            self.commandReceived(data)
+        else:
+            self._frames.append(data)
+            for cb in self._cbs:
+                cb(data, wants_more)
+
+    def commandReceived(self, data, offset=0):
+        cmd_name = self.unpackString(data, offset)
+        name_size = len(cmd_name)
+        cmd_data = data[offset+1+name_size:]
+        cmd_offset = 0
+        props = {}
+        while len(cmd_data) > cmd_offset:
+            name = self.unpackString(cmd_data, cmd_offset)
+            cmd_offset += len(name)+1
+            value = self.unpackString(cmd_data, cmd_offset+3)
+            cmd_offset += len(value)+1+3
+            props[name] = value
+        if DEBUG:
+            print "CMD", cmd_name, props
+
+    def unpackString(self, data, offset):
+        str_size = struct.unpack_from('B', data, offset)[0]
+        return data[offset+1:offset+1+str_size]
 
     # Base protocol events
     def connectionMade(self):
         if DEBUG:
             print "Connected"
-        self.sendRaw(self.buildGreeting())
+        self.sendRaw(self.buildGreeting(), force=True)
         if self.send_handshake:
-            self.send(self.buildHandshake())
+            self.send(self.buildHandshake(), is_cmd=True)
 
     # High level protocol
     def buildGreeting(self, mechanism='NULL', is_server=0):
@@ -56,7 +78,6 @@ class Zmq3Protocol(Protocol):
         data += struct.pack('B', int(is_server))
         # filler
         data += chr(0)*31
-
         return data
 
     def buildSubscribeHandshake(self):
@@ -67,8 +88,8 @@ class Zmq3Protocol(Protocol):
 
     def buildReadyHandshake(self):
         cmd = 'READY'
-        #data = struct.pack('B', len(cmd)) + cmd
-        data = struct.pack('BB', len(cmd), 0xd5) + cmd
+        data = struct.pack('B', len(cmd)) + cmd
+        #data = struct.pack('BB', len(cmd), 0xd5) + cmd
         return data
 
     def buildHandshake(self):
@@ -87,17 +108,32 @@ class Zmq3Protocol(Protocol):
         return data
 
     def parseHeader(self, data):
-        if not data.startswith(SIGNATURE):
-            print "Incorrect signature"
-        else:
-            print "Signature ok"
-        version = struct.unpack('B', data[10])[0]
-        if not version == self.version:
-            print "Incorrect version", version
+        # http://rfc.zeromq.org/spec:23#toc28
+        if data[0] == chr(0xFF) and len(data) < 12:
+            self.header_size = 12
+            self._data = data
+            self.proto_state = 0
+            if DEBUG:
+                print "wait for data"
+            return
         if DEBUG:
-            print "Version ok", self.version
+            print "Checking header"
+        if data[0] == chr(0xFF):
+            if (ord(data[9]) & 0x01) == 0:
+                print "version one, long length for identity"
+            else:
+                print "zmq 2.0 or later [%s]" % ord(data[10])
+        if data[0] == chr(0xFF):
+            v = data[10:]
+        else:
+            v = data
+        if not v.startswith(struct.pack('BB', 0x03, 0x00)):
+            print "Incorrect server version"
+        elif DEBUG:
+            print "Server ok"
+
         if len(data) >= 64:
-            self.parseMinorHeader(data, self.header_size)
+            self.parseMinorHeader(data, 11)
         else:
             self.proto_state = 1
             self._data = data[self.header_size:]
@@ -107,17 +143,19 @@ class Zmq3Protocol(Protocol):
         minor = struct.unpack_from('B', data, offset)[0]
         mechanism = data[offset+1:offset+21]
         as_server = struct.unpack_from('B', data, offset+21)[0]
-        #print " minor header", minor, mechanism, as_server
+        # print " minor header", minor, mechanism, as_server, len(data) - offset-53
         if len(data) > offset + 53:
             self.parseFrameData(data, offset+53)
 
     # Frame functions
-    def buildFrame(self, data, more=0):
+    def buildFrame(self, data, more=0, is_cmd=0):
         data_len = len(data)
         if more:
             flags = FLAG_MORE
         else:
             flags = 0
+        if is_cmd:
+            flags = flags | FLAG_CMD
         if data_len < 255:
             msg = struct.pack('BB', flags, data_len)
         else:
@@ -138,7 +176,8 @@ class Zmq3Protocol(Protocol):
             self.more = flags & FLAG_MORE         # only for messages
             long_size = flags & FLAG_LONG         # both commands and messages
             self.is_command = flags & FLAG_CMD
-            print " flags", self.more, long_size, self.is_command
+            if DEBUG:
+                print " flags", self.more, long_size, self.is_command
             if long_size:
                 self.next_part = 2
             else:
@@ -149,11 +188,13 @@ class Zmq3Protocol(Protocol):
             size = struct.unpack_from('B', data, offset)[0]
             self.size = size
             self.next_part = 3
-            print " start short size", self.size
-            return offset
+            if DEBUG:
+                print " start short size", self.size
+            return offset + 1
         # Extended size
         elif self.next_part == 2:
-            print " start extended size"
+            if DEBUG:
+                print " start extended size"
             if data_len < 8 + offset:
                 self._data = data[offset:]
             else:
@@ -162,7 +203,8 @@ class Zmq3Protocol(Protocol):
                 return offset + 8
         # Data
         elif self.next_part == 3:
-            print " check_data", data_len, offset+self.size
+            if DEBUG:
+                print " check_data", data_len, offset+self.size, self.size
             if data_len >= offset + self.size:
                 self.frameReceived(data[offset:offset+self.size], self.is_command, self.more)
                 self.next_part = 0
@@ -183,11 +225,15 @@ class Zmq3Protocol(Protocol):
     # Main receiving loop
     def dataReceived(self, data):
         if DEBUG:
-            print "data received", len(data)
+            print "data received", len(data), map(lambda s: ord(s), data)
         curr_data = self._data + data
         self._data = ''
         if self.proto_state == 0:
+            if DEBUG:
+                print "try header", len(curr_data)
             if len(curr_data) >= self.header_size:
+                if DEBUG:
+                    print "do header", len(curr_data)
                 self.parseHeader(curr_data)
                 self._zmqconnected = 1
                 while self._queue:
@@ -203,8 +249,8 @@ class Zmq3Protocol(Protocol):
             self.parseFrameData(curr_data)
 
     # Sending
-    def send(self, data, more=0):
-        frame = self.buildFrame(data, more)
+    def send(self, data, more=0, is_cmd=False):
+        frame = self.buildFrame(data, more, is_cmd)
         self.sendRaw(frame, more)
 
     def sendRaw(self, data, more=0, force=False):

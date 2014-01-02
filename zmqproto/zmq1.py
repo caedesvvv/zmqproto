@@ -9,8 +9,28 @@ class Zmq1Protocol(Zmq3Protocol):
     send_handshake = False
     # http://rfc.zeromq.org/spec:13
     def parseHeader(self, data):
-        if not data.startswith(struct.pack('BB', 0x01, 0x00)):
+        # http://rfc.zeromq.org/spec:23#toc28
+        if data[0] == chr(0xFF) and len(data) < 12:
+            self.header_size = 12
+            self._data = data
+            self.proto_state = 0
+            if DEBUG:
+                print "wait for data"
+            return
+        if DEBUG:
+            print "Checking header"
+        if data[0] == chr(0xFF):
+            if (ord(data[9]) & 0x01) == 0:
+                print "version one, long length for identity"
+            else:
+                print "zmq 2.0 or later", ord(data[10])
+            v = data[10:]
+        else:
+            v = data
+        if not v.startswith(struct.pack('BB', 0x01, 0x00)):
             print "Incorrect server version"
+        elif DEBUG:
+            print "Server ok"
         #print "Server version ok"
         self.proto_state = 2 # no minor header
 
@@ -22,7 +42,7 @@ class Zmq1Protocol(Zmq3Protocol):
         data = struct.pack('BB', 0x01, 0x00)
         return data
 
-    def buildFrame(self, data, more=0):
+    def buildFrame(self, data, more=0, is_cmd=False):
         data_len = len(data)+1
         if more:
             flags = FLAG_MORE
