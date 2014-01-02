@@ -24,6 +24,7 @@ class Zmq1Protocol(Zmq3Protocol):
                 print "version one, long length for identity"
             else:
                 print "zmq 2.0 or later", ord(data[10])
+            self.header_size = 12
             v = data[10:]
         else:
             v = data
