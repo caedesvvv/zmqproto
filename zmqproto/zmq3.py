@@ -229,7 +229,6 @@ class Zmq3Protocol(Protocol):
         curr_data = self._data + data
         self._data = ''
         if self.proto_state == 0:
-            print "do header", len(curr_data)
             if DEBUG:
                 print "try header", len(curr_data)
             if len(curr_data) >= self.header_size:
@@ -242,13 +241,11 @@ class Zmq3Protocol(Protocol):
             else:
                 self._data = curr_data
         elif self.proto_state == 1:
-            print "2nd header"
             if len(curr_data) >= 53:
                 self.parseMinorHeader(curr_data)
             else:
                 self._data = curr_data
         else:
-            print "frame"
             self.parseFrameData(curr_data)
 
     # Sending
