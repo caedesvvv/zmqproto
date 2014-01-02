@@ -2,7 +2,7 @@ import struct
 
 from twisted.internet.protocol import Factory
 
-from zmq3 import Zmq3Protocol, FLAG_MORE
+from zmq3 import Zmq3Protocol, FLAG_MORE, DEBUG
 
 class Zmq1Protocol(Zmq3Protocol):
     header_size = 2
