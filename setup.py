@@ -1,5 +1,4 @@
-from distutils.core import setup
-import sys
+from setuptools import setup
 
 setup(
         name='zmqproto',
